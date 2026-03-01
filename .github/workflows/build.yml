@@ -64,10 +64,33 @@ jobs:
             ncp/build/partition_table/partition-table.bin
             ncp/build/flasher_args.json
 
+  build-ncp-usb:
+    name: NCP USB Standalone (ESP32-H2)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build NCP USB firmware
+        uses: espressif/esp-idf-ci-action@v1
+        with:
+          esp_idf_version: v5.3.2
+          target: esp32h2
+          path: ncp-usb
+
+      - name: Upload NCP USB firmware
+        uses: actions/upload-artifact@v4
+        with:
+          name: ncp-usb-esp32h2
+          path: |
+            ncp-usb/build/esp_zigbee_ncp_usb.bin
+            ncp-usb/build/bootloader/bootloader.bin
+            ncp-usb/build/partition_table/partition-table.bin
+            ncp-usb/build/flasher_args.json
+
   deploy-pages:
     name: Deploy Web Flasher
     if: github.event_name == 'push' && github.ref == 'refs/heads/master'
-    needs: [build-gateway, build-ncp]
+    needs: [build-gateway, build-ncp, build-ncp-usb]
     runs-on: ubuntu-latest
     environment:
       name: github-pages
@@ -87,23 +110,34 @@ jobs:
           name: ncp-esp32h2
           path: artifacts/ncp
 
+      - name: Download NCP USB firmware
+        uses: actions/download-artifact@v4
+        with:
+          name: ncp-usb-esp32h2
+          path: artifacts/ncp-usb
+
       - name: Assemble site
         run: |
-          mkdir -p _site/firmware/s3 _site/firmware/h2
+          mkdir -p _site/firmware/s3 _site/firmware/h2 _site/firmware/h2-usb
           cp web-flasher/index.html _site/
           # Debug: show artifact layout
           echo "=== Gateway artifact ===" && find artifacts/gateway -type f
           echo "=== NCP artifact ===" && find artifacts/ncp -type f
+          echo "=== NCP USB artifact ===" && find artifacts/ncp-usb -type f
           # Gateway (S3) — find files regardless of nesting
           find artifacts/gateway -name bootloader.bin     | head -1 | xargs -I{} cp {} _site/firmware/s3/
           find artifacts/gateway -name partition-table.bin | head -1 | xargs -I{} cp {} _site/firmware/s3/
           find artifacts/gateway -name ota_data_initial.bin| head -1 | xargs -I{} cp {} _site/firmware/s3/ || true
           find artifacts/gateway -name zigbee-gateway.bin  | head -1 | xargs -I{} cp {} _site/firmware/s3/
           find artifacts/gateway -name storage.bin         | head -1 | xargs -I{} cp {} _site/firmware/s3/ || true
-          # NCP (H2)
+          # NCP (H2) — UART variant (for gateway board)
           find artifacts/ncp -name bootloader.bin          | head -1 | xargs -I{} cp {} _site/firmware/h2/
           find artifacts/ncp -name partition-table.bin      | head -1 | xargs -I{} cp {} _site/firmware/h2/
           find artifacts/ncp -name esp_zigbee_ncp.bin       | head -1 | xargs -I{} cp {} _site/firmware/h2/
+          # NCP (H2) — USB standalone variant
+          find artifacts/ncp-usb -name bootloader.bin           | head -1 | xargs -I{} cp {} _site/firmware/h2-usb/
+          find artifacts/ncp-usb -name partition-table.bin       | head -1 | xargs -I{} cp {} _site/firmware/h2-usb/
+          find artifacts/ncp-usb -name esp_zigbee_ncp_usb.bin    | head -1 | xargs -I{} cp {} _site/firmware/h2-usb/
           # Version info
           echo "{\"commit\":\"${{ github.sha }}\",\"date\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\",\"repo\":\"${{ github.repository }}\"}" > _site/version.json
           echo "=== Site contents ===" && find _site -type f

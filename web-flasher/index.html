@@ -99,6 +99,10 @@ h1{font-size:22px;font-weight:600;margin-bottom:8px}
       ESP32-H2
       <div class="chip-label">NCP Firmware</div>
     </div>
+    <div class="tab" id="tabH2USB" onclick="switchTab('h2usb')">
+      ESP32-H2 USB
+      <div class="chip-label">Standalone NCP</div>
+    </div>
   </div>
 
   <!-- S3 Panel -->
@@ -171,6 +175,42 @@ h1{font-size:22px;font-weight:600;margin-bottom:8px}
     </div>
   </div>
 
+  <!-- H2 USB Standalone Panel -->
+  <div class="panel" id="panelH2USB">
+    <div class="card">
+      <h2>Connect ESP32-H2 (USB Standalone)</h2>
+      <p class="info" style="margin-bottom:8px">This firmware makes the ESP32-H2 a standalone Zigbee coordinator via USB-C. Use with zigbee2mqtt, ZHA, or any NCP-compatible software.</p>
+      <div class="connected" id="connStatusH2USB"><span class="dot off"></span>Not connected</div>
+      <div class="chip-info" id="chipInfoH2USB" style="display:none"></div>
+      <div class="actions" style="margin-top:12px">
+        <button class="btn btn-primary" id="btnConnectH2USB" onclick="doConnect('h2usb')">Connect to ESP32-H2</button>
+        <button class="btn btn-outline" id="btnDisconnectH2USB" onclick="doDisconnect('h2usb')" style="display:none">Disconnect</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Firmware Files</h2>
+      <p class="info">ESP32-H2 NCP USB standalone — 2MB flash, DIO mode. Click 📁 to use a local file.</p>
+      <div class="files" id="fileListH2USB"></div>
+      <div class="checkbox-row">
+        <input type="checkbox" id="chkEraseH2USB" checked>
+        <label for="chkEraseH2USB">Erase flash before writing (recommended for clean install)</label>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Flash</h2>
+      <div class="actions">
+        <button class="btn btn-primary" id="btnFlashH2USB" onclick="doFlash('h2usb')" disabled>Flash ESP32-H2 (USB)</button>
+        <button class="btn btn-danger" id="btnEraseH2USB" onclick="doEraseOnly('h2usb')" disabled>Erase Flash Only</button>
+      </div>
+      <div class="progress-wrap" id="progressWrapH2USB">
+        <div class="progress-bar"><div class="progress-fill" id="progressFillH2USB"></div></div>
+        <div class="progress-text" id="progressTextH2USB">Ready</div>
+      </div>
+    </div>
+  </div>
+
   <div class="card">
     <h2>Log</h2>
     <div class="log" id="log"></div>
@@ -205,11 +245,23 @@ const CHIPS = {
       { name: 'esp_zigbee_ncp.bin',    offset: 0x20000, url: 'firmware/h2/esp_zigbee_ncp.bin' },
     ],
   },
+  h2usb: {
+    label: 'ESP32-H2 USB',
+    flashSize: '2MB',
+    flashMode: 'dio',
+    flashFreq: '48m',
+    files: [
+      { name: 'bootloader.bin',          offset: 0x0,     url: 'firmware/h2-usb/bootloader.bin' },
+      { name: 'partition-table.bin',      offset: 0x8000,  url: 'firmware/h2-usb/partition-table.bin' },
+      { name: 'esp_zigbee_ncp_usb.bin',   offset: 0x20000, url: 'firmware/h2-usb/esp_zigbee_ncp_usb.bin' },
+    ],
+  },
 };
 
 const state = {
   s3: { esploader: null, transport: null, fileData: {}, connected: false, flashed: false },
   h2: { esploader: null, transport: null, fileData: {}, connected: false, flashed: false },
+  h2usb: { esploader: null, transport: null, fileData: {}, connected: false, flashed: false },
 };
 
 /* ── Log ───────────────────────────────────── */
@@ -415,7 +467,8 @@ window.doFlash = async function(chip) {
       log(`[${cfg.label}] Flash erased`, 'ok');
     }
 
-    const flashFiles = cfg.files.filter(f => s.fileData[f.name]).map(f => ({
+    const loadedFiles = cfg.files.filter(f => s.fileData[f.name]);
+    const flashFiles = loadedFiles.map(f => ({
       data: binaryToStr(new Uint8Array(s.fileData[f.name])),
       address: f.offset,
     }));
@@ -434,7 +487,7 @@ window.doFlash = async function(chip) {
       reportProgress: (fileIndex, w, total) => {
         const prevFiles = flashFiles.slice(0, fileIndex).reduce((sum, f) => sum + f.data.length, 0);
         const pct = Math.round((prevFiles + w) / totalSize * 100);
-        setProgress(chip, pct, `Flashing ${cfg.files[fileIndex]?.name || '?'}... ${pct}%`);
+        setProgress(chip, pct, `Flashing ${loadedFiles[fileIndex]?.name || '?'}... ${pct}%`);
       },
     });
 
@@ -447,13 +500,12 @@ window.doFlash = async function(chip) {
     s.flashed = true;
     markTabDone(chip);
 
-    /* Auto-switch to next chip if not done */
-    const other = chip === 's3' ? 'h2' : 's3';
-    if (!state[other].flashed) {
-      log(`\nNow switch to ${CHIPS[other].label}. Plug it in via USB and enter download mode.`, 'warn');
-      setTimeout(() => switchTab(other), 500);
-    } else {
-      log('\nBoth chips flashed successfully!', 'ok');
+    /* Auto-switch: s3→h2, h2→done, h2usb is standalone */
+    if (chip === 's3' && !state.h2.flashed) {
+      log(`\nNow switch to ${CHIPS.h2.label}. Plug it in via USB and enter download mode.`, 'warn');
+      setTimeout(() => switchTab('h2'), 500);
+    } else if (chip !== 'h2usb') {
+      log('\nFlashing complete!', 'ok');
     }
 
   } catch (e) {
@@ -514,7 +566,7 @@ async function loadVersion() {
 
 /* ── Cleanup on page unload ────────────────── */
 window.addEventListener('beforeunload', () => {
-  for (const chip of ['s3', 'h2']) {
+  for (const chip of ['s3', 'h2', 'h2usb']) {
     try {
       if (state[chip].transport) state[chip].transport.disconnect();
     } catch (e) {}
@@ -528,9 +580,11 @@ if (!('serial' in navigator)) {
   log('ERROR: Web Serial API not supported. Use Chrome or Edge (desktop).', 'err');
   document.getElementById('btnConnectS3').disabled = true;
   document.getElementById('btnConnectH2').disabled = true;
+  document.getElementById('btnConnectH2USB').disabled = true;
 } else {
   loadFirmwareFiles('s3');
   loadFirmwareFiles('h2');
+  loadFirmwareFiles('h2usb');
 }
 loadVersion();
 </script>

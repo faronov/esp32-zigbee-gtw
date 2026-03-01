@@ -19,6 +19,7 @@ extern "C" {
 typedef enum {
     NCP_HOST_CONNECTION_MODE_UART = 0x01,       /*!< NCP UART connection with the host */
     NCP_HOST_CONNECTION_MODE_SPI = 0x02,        /*!< NCP SPI connection with the host */
+    NCP_HOST_CONNECTION_MODE_USB = 0x03,        /*!< NCP USB Serial/JTAG connection with the host */
 } esp_ncp_host_connection_mode_t;
 
 /**
