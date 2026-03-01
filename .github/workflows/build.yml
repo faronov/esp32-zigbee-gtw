@@ -1,10 +1,19 @@
-name: Build
+name: Build & Deploy
 
 on:
   push:
     branches: [master]
   pull_request:
     branches: [master]
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
 
 jobs:
   build-gateway:
@@ -28,6 +37,7 @@ jobs:
             gateway/build/zigbee-gateway.bin
             gateway/build/bootloader/bootloader.bin
             gateway/build/partition_table/partition-table.bin
+            gateway/build/ota_data_initial.bin
             gateway/build/storage.bin
             gateway/build/flasher_args.json
 
@@ -53,3 +63,49 @@ jobs:
             ncp/build/bootloader/bootloader.bin
             ncp/build/partition_table/partition-table.bin
             ncp/build/flasher_args.json
+
+  deploy-pages:
+    name: Deploy Web Flasher
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    needs: [build-gateway, build-ncp]
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download gateway firmware
+        uses: actions/download-artifact@v4
+        with:
+          name: gateway-esp32s3
+          path: artifacts/gateway
+
+      - name: Download NCP firmware
+        uses: actions/download-artifact@v4
+        with:
+          name: ncp-esp32h2
+          path: artifacts/ncp
+
+      - name: Assemble site
+        run: |
+          mkdir -p _site/firmware/s3 _site/firmware/h2
+          cp web-flasher/index.html _site/
+          # Gateway (S3)
+          cp artifacts/gateway/gateway/build/bootloader/bootloader.bin      _site/firmware/s3/
+          cp artifacts/gateway/gateway/build/partition_table/partition-table.bin _site/firmware/s3/
+          cp artifacts/gateway/gateway/build/ota_data_initial.bin           _site/firmware/s3/ || true
+          cp artifacts/gateway/gateway/build/zigbee-gateway.bin             _site/firmware/s3/
+          cp artifacts/gateway/gateway/build/storage.bin                    _site/firmware/s3/ || true
+          # NCP (H2)
+          cp artifacts/ncp/ncp/build/bootloader/bootloader.bin              _site/firmware/h2/
+          cp artifacts/ncp/ncp/build/partition_table/partition-table.bin     _site/firmware/h2/
+          cp artifacts/ncp/ncp/build/esp_zigbee_ncp.bin                     _site/firmware/h2/
+          echo "Site contents:" && find _site -type f
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

@@ -170,10 +170,11 @@ const CHIPS = {
     flashMode: 'dio',
     flashFreq: '80m',
     files: [
-      { name: 'bootloader.bin',      offset: 0x0,     url: '/firmware/s3/bootloader.bin' },
-      { name: 'partition-table.bin',  offset: 0x8000,  url: '/firmware/s3/partition-table.bin' },
-      { name: 'ota_data_initial.bin', offset: 0xf000,  url: '/firmware/s3/ota_data_initial.bin' },
-      { name: 'zigbee-gateway.bin',   offset: 0x20000, url: '/firmware/s3/zigbee-gateway.bin' },
+      { name: 'bootloader.bin',      offset: 0x0,     url: 'firmware/s3/bootloader.bin' },
+      { name: 'partition-table.bin',  offset: 0x8000,  url: 'firmware/s3/partition-table.bin' },
+      { name: 'ota_data_initial.bin', offset: 0xf000,  url: 'firmware/s3/ota_data_initial.bin' },
+      { name: 'zigbee-gateway.bin',   offset: 0x20000, url: 'firmware/s3/zigbee-gateway.bin' },
+      { name: 'storage.bin',          offset: 0x3A5000,url: 'firmware/s3/storage.bin' },
     ],
   },
   h2: {
@@ -182,9 +183,9 @@ const CHIPS = {
     flashMode: 'dio',
     flashFreq: '48m',
     files: [
-      { name: 'bootloader.bin',       offset: 0x0,     url: '/firmware/h2/bootloader.bin' },
-      { name: 'partition-table.bin',   offset: 0x8000,  url: '/firmware/h2/partition-table.bin' },
-      { name: 'esp_zigbee_ncp.bin',    offset: 0x20000, url: '/firmware/h2/esp_zigbee_ncp.bin' },
+      { name: 'bootloader.bin',       offset: 0x0,     url: 'firmware/h2/bootloader.bin' },
+      { name: 'partition-table.bin',   offset: 0x8000,  url: 'firmware/h2/partition-table.bin' },
+      { name: 'esp_zigbee_ncp.bin',    offset: 0x20000, url: 'firmware/h2/esp_zigbee_ncp.bin' },
     ],
   },
 };
