@@ -20,6 +20,17 @@ jobs:
           target: esp32s3
           path: gateway
 
+      - name: Upload gateway firmware
+        uses: actions/upload-artifact@v4
+        with:
+          name: gateway-esp32s3
+          path: |
+            gateway/build/zigbee-gateway.bin
+            gateway/build/bootloader/bootloader.bin
+            gateway/build/partition_table/partition-table.bin
+            gateway/build/storage.bin
+            gateway/build/flasher_args.json
+
   build-ncp:
     name: NCP (ESP32-H2)
     runs-on: ubuntu-latest
@@ -32,3 +43,13 @@ jobs:
           esp_idf_version: v5.3.2
           target: esp32h2
           path: ncp
+
+      - name: Upload NCP firmware
+        uses: actions/upload-artifact@v4
+        with:
+          name: ncp-esp32h2
+          path: |
+            ncp/build/esp_zigbee_ncp.bin
+            ncp/build/bootloader/bootloader.bin
+            ncp/build/partition_table/partition-table.bin
+            ncp/build/flasher_args.json
