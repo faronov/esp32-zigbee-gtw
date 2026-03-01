@@ -104,6 +104,8 @@ jobs:
           find artifacts/ncp -name bootloader.bin          | head -1 | xargs -I{} cp {} _site/firmware/h2/
           find artifacts/ncp -name partition-table.bin      | head -1 | xargs -I{} cp {} _site/firmware/h2/
           find artifacts/ncp -name esp_zigbee_ncp.bin       | head -1 | xargs -I{} cp {} _site/firmware/h2/
+          # Version info
+          echo "{\"commit\":\"${{ github.sha }}\",\"date\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\",\"repo\":\"${{ github.repository }}\"}" > _site/version.json
           echo "=== Site contents ===" && find _site -type f
 
       - name: Upload Pages artifact

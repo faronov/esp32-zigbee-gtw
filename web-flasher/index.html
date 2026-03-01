@@ -11,21 +11,30 @@ html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Ro
 .container{max-width:720px;margin:0 auto;padding:24px}
 h1{font-size:22px;font-weight:600;margin-bottom:8px}
 .subtitle{color:var(--text2);margin-bottom:24px;font-size:13px}
+.version-info{color:var(--text2);font-size:11px;margin-bottom:16px}
+.version-info a{color:var(--primary);text-decoration:none}
 .card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:16px}
 .card h2{font-size:15px;font-weight:500;margin-bottom:12px;color:var(--primary)}
 .card.done{border-color:var(--success);opacity:.7}
 .card.done h2::after{content:' ✓';color:var(--success)}
 .warning{background:rgba(255,167,38,.1);border:1px solid rgba(255,167,38,.3);border-radius:8px;padding:12px 16px;margin-bottom:16px;color:var(--warn);font-size:13px}
+.browser-error{background:rgba(239,83,80,.15);border:1px solid rgba(239,83,80,.4);border-radius:8px;padding:16px;margin-bottom:16px;color:var(--danger);font-size:14px;text-align:center}
+.browser-error a{color:var(--primary);text-decoration:underline}
 .info{color:var(--text2);font-size:13px;margin-bottom:12px}
 .files{display:flex;flex-direction:column;gap:6px;margin-bottom:16px}
 .file-row{display:flex;align-items:center;gap:12px;padding:8px 12px;background:rgba(255,255,255,.03);border-radius:6px;font-family:monospace;font-size:13px}
 .file-offset{color:var(--primary);min-width:70px}
 .file-name{flex:1}
+.file-name .optional-tag{color:var(--text2);font-size:10px;font-family:-apple-system,sans-serif;margin-left:6px}
 .file-size{color:var(--text2)}
 .file-status{width:8px;height:8px;border-radius:50%;flex-shrink:0}
 .file-status.pending{background:#555}
 .file-status.loaded{background:var(--success)}
 .file-status.error{background:var(--danger)}
+.file-status.skipped{background:var(--text2)}
+.file-actions{display:flex;gap:4px;flex-shrink:0}
+.file-actions .btn-tiny{padding:2px 8px;font-size:11px;border:1px solid var(--border);border-radius:4px;background:transparent;color:var(--text2);cursor:pointer;transition:.15s}
+.file-actions .btn-tiny:hover{background:rgba(255,255,255,.08);color:var(--text)}
 .btn{padding:10px 24px;border:none;border-radius:8px;cursor:pointer;font-size:14px;font-weight:500;transition:.15s;display:inline-flex;align-items:center;gap:8px}
 .btn:disabled{opacity:.4;cursor:not-allowed}
 .btn-primary{background:var(--accent);color:#fff}
@@ -62,14 +71,22 @@ h1{font-size:22px;font-weight:600;margin-bottom:8px}
 .panel.active{display:block}
 .checkbox-row{display:flex;align-items:center;gap:8px;margin-bottom:12px;font-size:13px;color:var(--text2)}
 .checkbox-row input{accent-color:var(--accent)}
+/* Hidden file inputs for local upload */
+.hidden-input{display:none}
 </style>
 </head>
 <body>
 <div class="container">
   <h1>ESP32 Zigbee Gateway — Web Flasher</h1>
   <p class="subtitle">Flash firmware to ESP32-S3 (gateway) and ESP32-H2 (NCP) sequentially via USB. Requires Chrome/Edge.</p>
+  <div class="version-info" id="versionInfo"></div>
 
-  <div class="warning">
+  <div class="browser-error" id="browserError" style="display:none">
+    ⚠️ Web Serial API is not supported in this browser.<br>
+    Please use <a href="https://www.google.com/chrome/">Chrome</a> or <a href="https://www.microsoft.com/edge">Edge</a> (desktop only).
+  </div>
+
+  <div class="warning" id="flashWarning">
     Before flashing each chip: hold BOOT button, press RESET, then release BOOT to enter download mode.
   </div>
 
@@ -98,7 +115,7 @@ h1{font-size:22px;font-weight:600;margin-bottom:8px}
 
     <div class="card">
       <h2>Firmware Files</h2>
-      <p class="info">ESP32-S3 gateway firmware — 4MB flash, DIO mode.</p>
+      <p class="info">ESP32-S3 gateway firmware — 4MB flash, DIO mode. Click 📁 to use a local file.</p>
       <div class="files" id="fileListS3"></div>
       <div class="checkbox-row">
         <input type="checkbox" id="chkEraseS3" checked>
@@ -133,7 +150,7 @@ h1{font-size:22px;font-weight:600;margin-bottom:8px}
 
     <div class="card">
       <h2>Firmware Files</h2>
-      <p class="info">ESP32-H2 NCP (Zigbee coordinator) firmware — 2MB flash, DIO mode.</p>
+      <p class="info">ESP32-H2 NCP (Zigbee coordinator) firmware — 2MB flash, DIO mode. Click 📁 to use a local file.</p>
       <div class="files" id="fileListH2"></div>
       <div class="checkbox-row">
         <input type="checkbox" id="chkEraseH2" checked>
@@ -172,9 +189,9 @@ const CHIPS = {
     files: [
       { name: 'bootloader.bin',      offset: 0x0,     url: 'firmware/s3/bootloader.bin' },
       { name: 'partition-table.bin',  offset: 0x8000,  url: 'firmware/s3/partition-table.bin' },
-      { name: 'ota_data_initial.bin', offset: 0xf000,  url: 'firmware/s3/ota_data_initial.bin' },
+      { name: 'ota_data_initial.bin', offset: 0xf000,  url: 'firmware/s3/ota_data_initial.bin', optional: true },
       { name: 'zigbee-gateway.bin',   offset: 0x20000, url: 'firmware/s3/zigbee-gateway.bin' },
-      { name: 'storage.bin',          offset: 0x3A5000,url: 'firmware/s3/storage.bin' },
+      { name: 'storage.bin',          offset: 0x3A5000,url: 'firmware/s3/storage.bin', optional: true },
     ],
   },
   h2: {
@@ -232,8 +249,11 @@ function updateConnStatus(chip, on, text) {
 
 function updateFlashBtn(chip) {
   const cfg = CHIPS[chip];
-  const allLoaded = cfg.files.every(f => state[chip].fileData[f.name]);
-  document.getElementById('btnFlash' + ucChip(chip)).disabled = !state[chip].connected || !allLoaded;
+  /* Only require non-optional files */
+  const requiredLoaded = cfg.files
+    .filter(f => !f.optional)
+    .every(f => state[chip].fileData[f.name]);
+  document.getElementById('btnFlash' + ucChip(chip)).disabled = !state[chip].connected || !requiredLoaded;
   document.getElementById('btnErase' + ucChip(chip)).disabled = !state[chip].connected;
 }
 
@@ -247,39 +267,84 @@ function setProgress(chip, pct, text) {
 function renderFiles(chip) {
   const cfg = CHIPS[chip];
   const el = document.getElementById('fileList' + ucChip(chip));
-  el.innerHTML = cfg.files.map(f => {
-    const loaded = state[chip].fileData[f.name];
-    const size = loaded ? (loaded.byteLength / 1024).toFixed(1) + ' KB' : '...';
-    const status = loaded ? 'loaded' : (loaded === false ? 'error' : 'pending');
+  el.innerHTML = cfg.files.map((f, i) => {
+    const data = state[chip].fileData[f.name];
+    const loaded = !!data;
+    const failed = data === false;
+    const skipped = failed && f.optional;
+    const size = loaded ? (data.byteLength / 1024).toFixed(1) + ' KB' : (skipped ? 'skipped' : (failed ? 'failed' : '...'));
+    const status = loaded ? 'loaded' : (skipped ? 'skipped' : (failed ? 'error' : 'pending'));
+    const optTag = f.optional ? '<span class="optional-tag">(optional)</span>' : '';
+    const retryBtn = failed && !skipped ? `<button class="btn-tiny" onclick="retryFile('${chip}',${i})">↻</button>` : '';
     return `<div class="file-row">
       <span class="file-status ${status}"></span>
       <span class="file-offset">0x${f.offset.toString(16).padStart(6, '0')}</span>
-      <span class="file-name">${f.name}</span>
+      <span class="file-name">${f.name}${optTag}</span>
       <span class="file-size">${size}</span>
+      <span class="file-actions">${retryBtn}<button class="btn-tiny" onclick="pickLocalFile('${chip}',${i})" title="Load local file">📁</button></span>
     </div>`;
   }).join('');
+}
+
+async function loadFirmwareFile(chip, idx) {
+  const cfg = CHIPS[chip];
+  const f = cfg.files[idx];
+  try {
+    const resp = await fetch(f.url);
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    state[chip].fileData[f.name] = await resp.arrayBuffer();
+    log(`  ${f.name}: ${(state[chip].fileData[f.name].byteLength / 1024).toFixed(1)} KB`, 'ok');
+  } catch (e) {
+    state[chip].fileData[f.name] = false;
+    if (f.optional) {
+      log(`  ${f.name}: not available (optional, skipped)`, 'warn');
+    } else {
+      log(`  ${f.name}: FAILED (${e.message})`, 'err');
+    }
+  }
+  renderFiles(chip);
+  updateFlashBtn(chip);
 }
 
 async function loadFirmwareFiles(chip) {
   const cfg = CHIPS[chip];
   log(`[${cfg.label}] Loading firmware files...`, 'info');
   renderFiles(chip);
-  for (const f of cfg.files) {
-    try {
-      const resp = await fetch(f.url);
-      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-      state[chip].fileData[f.name] = await resp.arrayBuffer();
-      log(`  ${f.name}: ${(state[chip].fileData[f.name].byteLength / 1024).toFixed(1)} KB`, 'ok');
-    } catch (e) {
-      state[chip].fileData[f.name] = false;
-      log(`  ${f.name}: FAILED (${e.message})`, 'err');
-    }
-    renderFiles(chip);
+  for (let i = 0; i < cfg.files.length; i++) {
+    await loadFirmwareFile(chip, i);
   }
   const loaded = cfg.files.filter(f => state[chip].fileData[f.name]).length;
-  log(`[${cfg.label}] ${loaded}/${cfg.files.length} files loaded`, loaded === cfg.files.length ? 'ok' : 'warn');
-  updateFlashBtn(chip);
+  const required = cfg.files.filter(f => !f.optional).length;
+  const reqLoaded = cfg.files.filter(f => !f.optional && state[chip].fileData[f.name]).length;
+  log(`[${cfg.label}] ${loaded}/${cfg.files.length} files loaded (${reqLoaded}/${required} required)`,
+    reqLoaded === required ? 'ok' : 'err');
 }
+
+/* ── Retry / local file upload ─────────────── */
+window.retryFile = async function(chip, idx) {
+  const f = CHIPS[chip].files[idx];
+  log(`Retrying ${f.name}...`, 'info');
+  await loadFirmwareFile(chip, idx);
+};
+
+window.pickLocalFile = function(chip, idx) {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = '.bin';
+  input.className = 'hidden-input';
+  input.onchange = async () => {
+    const file = input.files[0];
+    if (!file) return;
+    const f = CHIPS[chip].files[idx];
+    state[chip].fileData[f.name] = await file.arrayBuffer();
+    log(`  ${f.name}: loaded local file "${file.name}" (${(state[chip].fileData[f.name].byteLength / 1024).toFixed(1)} KB)`, 'ok');
+    renderFiles(chip);
+    updateFlashBtn(chip);
+    input.remove();
+  };
+  document.body.appendChild(input);
+  input.click();
+};
 
 /* ── Connect ───────────────────────────────── */
 window.doConnect = async function(chip) {
@@ -369,7 +434,7 @@ window.doFlash = async function(chip) {
       reportProgress: (fileIndex, w, total) => {
         const prevFiles = flashFiles.slice(0, fileIndex).reduce((sum, f) => sum + f.data.length, 0);
         const pct = Math.round((prevFiles + w) / totalSize * 100);
-        setProgress(chip, pct, `Flashing ${cfg.files[fileIndex].name}... ${pct}%`);
+        setProgress(chip, pct, `Flashing ${cfg.files[fileIndex]?.name || '?'}... ${pct}%`);
       },
     });
 
@@ -421,20 +486,53 @@ window.doEraseOnly = async function(chip) {
 
 /* ── Utility ───────────────────────────────── */
 function binaryToStr(u8arr) {
-  let str = '';
-  for (let i = 0; i < u8arr.length; i++) str += String.fromCharCode(u8arr[i]);
-  return str;
+  /* Convert in 8KB chunks to avoid O(n²) string concatenation */
+  const CHUNK = 8192;
+  const parts = [];
+  for (let i = 0; i < u8arr.length; i += CHUNK) {
+    parts.push(String.fromCharCode.apply(null, u8arr.subarray(i, i + CHUNK)));
+  }
+  return parts.join('');
 }
+
+/* ── Version info ──────────────────────────── */
+async function loadVersion() {
+  try {
+    const resp = await fetch('version.json');
+    if (!resp.ok) return;
+    const v = await resp.json();
+    const el = document.getElementById('versionInfo');
+    const sha = v.commit ? v.commit.substring(0, 7) : '';
+    const date = v.date || '';
+    const parts = [];
+    if (date) parts.push(`Built: ${date}`);
+    if (sha && v.repo) parts.push(`Commit: <a href="https://github.com/${v.repo}/commit/${v.commit}" target="_blank">${sha}</a>`);
+    else if (sha) parts.push(`Commit: ${sha}`);
+    if (parts.length) el.innerHTML = parts.join(' · ');
+  } catch (e) { /* version.json not available, that's fine */ }
+}
+
+/* ── Cleanup on page unload ────────────────── */
+window.addEventListener('beforeunload', () => {
+  for (const chip of ['s3', 'h2']) {
+    try {
+      if (state[chip].transport) state[chip].transport.disconnect();
+    } catch (e) {}
+  }
+});
 
 /* ── Init ──────────────────────────────────── */
 if (!('serial' in navigator)) {
-  log('ERROR: Web Serial API not supported. Use Chrome or Edge.', 'err');
+  document.getElementById('browserError').style.display = 'block';
+  document.getElementById('flashWarning').style.display = 'none';
+  log('ERROR: Web Serial API not supported. Use Chrome or Edge (desktop).', 'err');
   document.getElementById('btnConnectS3').disabled = true;
   document.getElementById('btnConnectH2').disabled = true;
 } else {
   loadFirmwareFiles('s3');
   loadFirmwareFiles('h2');
 }
+loadVersion();
 </script>
 </body>
 </html>
