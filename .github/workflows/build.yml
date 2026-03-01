@@ -91,17 +91,20 @@ jobs:
         run: |
           mkdir -p _site/firmware/s3 _site/firmware/h2
           cp web-flasher/index.html _site/
-          # Gateway (S3)
-          cp artifacts/gateway/gateway/build/bootloader/bootloader.bin      _site/firmware/s3/
-          cp artifacts/gateway/gateway/build/partition_table/partition-table.bin _site/firmware/s3/
-          cp artifacts/gateway/gateway/build/ota_data_initial.bin           _site/firmware/s3/ || true
-          cp artifacts/gateway/gateway/build/zigbee-gateway.bin             _site/firmware/s3/
-          cp artifacts/gateway/gateway/build/storage.bin                    _site/firmware/s3/ || true
+          # Debug: show artifact layout
+          echo "=== Gateway artifact ===" && find artifacts/gateway -type f
+          echo "=== NCP artifact ===" && find artifacts/ncp -type f
+          # Gateway (S3) — find files regardless of nesting
+          find artifacts/gateway -name bootloader.bin     | head -1 | xargs -I{} cp {} _site/firmware/s3/
+          find artifacts/gateway -name partition-table.bin | head -1 | xargs -I{} cp {} _site/firmware/s3/
+          find artifacts/gateway -name ota_data_initial.bin| head -1 | xargs -I{} cp {} _site/firmware/s3/ || true
+          find artifacts/gateway -name zigbee-gateway.bin  | head -1 | xargs -I{} cp {} _site/firmware/s3/
+          find artifacts/gateway -name storage.bin         | head -1 | xargs -I{} cp {} _site/firmware/s3/ || true
           # NCP (H2)
-          cp artifacts/ncp/ncp/build/bootloader/bootloader.bin              _site/firmware/h2/
-          cp artifacts/ncp/ncp/build/partition_table/partition-table.bin     _site/firmware/h2/
-          cp artifacts/ncp/ncp/build/esp_zigbee_ncp.bin                     _site/firmware/h2/
-          echo "Site contents:" && find _site -type f
+          find artifacts/ncp -name bootloader.bin          | head -1 | xargs -I{} cp {} _site/firmware/h2/
+          find artifacts/ncp -name partition-table.bin      | head -1 | xargs -I{} cp {} _site/firmware/h2/
+          find artifacts/ncp -name esp_zigbee_ncp.bin       | head -1 | xargs -I{} cp {} _site/firmware/h2/
+          echo "=== Site contents ===" && find _site -type f
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
